@@ -45,6 +45,7 @@ class Interpreter:
     def handle_custom(self, command):
         custom_function = self.functions[command.name]
         Interpreter.assert_args_length(command, len(custom_function.args))
+        # TODO: handle context stack correctly
         self.run(custom_function.instructions)
 
     def handle_zero(self, register):
@@ -79,7 +80,7 @@ class Interpreter:
                     self.handle_incr(command.args[0])
                 elif command.name == 'ASGN':
                     Interpreter.assert_args_length(command, 2)
-                    self.handle_asgn(command.args[0], command.args[0])
+                    self.handle_asgn(command.args[0], command.args[1])
                 elif command.name == 'PRNT':
                     Interpreter.assert_args_length(command, 1)
                     self.handle_prnt(command.args[0])
@@ -93,6 +94,7 @@ class Interpreter:
                 else: raise InterpretException('No function found {}'.format(command.name))
 
             except InterpretException as e:
+                # BUG: line numbers are broken in recursive run calls
                 print('Error {}:'.format(i + 1), e.args[0])
 
 def parse(lines):
