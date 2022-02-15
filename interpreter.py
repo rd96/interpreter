@@ -2,29 +2,31 @@
 import sys
 import re
 
-def read_file(filename):
-    with open(filename, 'r') as file:
-        return file.readlines()
-
 class InterpretException(Exception): pass
 
 class Command:
     def __init__(self, name, args):
         self.name = name
         self.args = args
-        self.instructions = []
-
-    def append(self, instruction):
-        self.instructions.append(instruction)
-
-    def extend(self, instructions):
-        self.instructions.extend(instructions)
 
     def __str__(self):
-        if len(self.instructions):
-            return "{}({}){{\n{}\n}}".format(self.name, ", ".join(self.args), "\n".join([str(it) for it in self.instructions]))
-        else:
-            return "{}({})".format(self.name, ", ".join(self.args))
+        return "{}({})".format(self.name, ", ".join(self.args))
+
+class BlockCommand(Command):
+    def __init__(self, name, args):
+        super().__init__(name, args)
+        self.instructions = []
+
+    def append_instruction(self, instruction):
+        self.instructions.append(instruction)
+
+    def __str__(self):
+        return "{}({}){{\n{}\n}}".format(self.name, ", ".join(self.args), "\n".join([str(it) for it in self.instructions]))
+
+class CustomFunction:
+    def __init__(self, args, instructions):
+        self.args = args
+        self.instructions = instructions
 
 class Interpreter:
     def __init__(self):
@@ -38,11 +40,10 @@ class Interpreter:
         if (register not in self.context[-1]): raise InterpretException('Register {} not present in registers'.format(register))
 
     def handle_def(self, name, args, instructions):
-        command = Command(name, args)
-        command.extend(instructions)
-        self.functions[name] = command
+        custom_function = CustomFunction(args, instructions)
+        self.functions[name] = custom_function
 
-    def handle_custom(self, command):
+    def handle_custom_function(self, command):
         custom_function = self.functions[command.name]
         Interpreter.assert_args_length(command, len(custom_function.args))
         # TODO: handle context stack correctly
@@ -90,7 +91,7 @@ class Interpreter:
                 elif command.name == 'DEF':
                     self.handle_def(command.args[0], command.args[1:], command.instructions)
                 elif command.name in self.functions:
-                    self.handle_custom(command)
+                    self.handle_custom_function(command)
                 else: raise InterpretException('No function found {}'.format(command.name))
 
             except InterpretException as e:
@@ -100,30 +101,34 @@ class Interpreter:
 def parse(lines):
     line_regex = re.compile('^\s*([A-Z0-9]+)\(([A-Z0-9,]*)\)({?)$')
     end_of_block_regex = re.compile('^\s*}\s*$')
-    context = [Command('MAIN', [])]
+    context = [BlockCommand('MAIN', [])]
 
     for l in lines:
         r = line_regex.match(l)
 
         if r is None:
             if end_of_block_regex.match(l):
-                context[-2].append(context.pop())
+                context[-2].append_instruction(context.pop())
         else:
             command = r.groups()[0]
             args = [] if len(r.groups()[1]) == 0 else r.groups()[1].split(',')
             is_block = r.groups()[2] == '{'
 
             if is_block:
-                context.append(Command(command, args))
+                context.append(BlockCommand(command, args))
             else:
-                context[-1].append(Command(command, args))
+                context[-1].append_instruction(Command(command, args))
 
     return context[0].instructions
+
+def read_file(filename):
+    with open(filename, 'r') as file:
+        return file.readlines()
 
 interpreter = Interpreter()
 
 commands = parse(read_file(sys.argv[1]))
 
-print("{}".format("\n".join([str(c) for c in commands])))
+# print("{}".format("\n".join([str(c) for c in commands])))
 
 interpreter.run(commands)
