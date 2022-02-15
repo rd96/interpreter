@@ -98,7 +98,7 @@ class Interpreter:
                 print('Error {}:'.format(i + 1), e.args[0])
 
 def parse(lines):
-    line_regex = re.compile('^\s*([A-Z]+)\(([A-Z,]*)\)({?)$')
+    line_regex = re.compile('^\s*([A-Z0-9]+)\(([A-Z0-9,]*)\)({?)$')
     end_of_block_regex = re.compile('^\s*}\s*$')
     context = [Command('MAIN', [])]
 
